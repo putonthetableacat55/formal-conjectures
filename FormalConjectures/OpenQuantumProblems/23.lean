@@ -13,8 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -/
+module
 
-import FormalConjectures.Util.ProblemImports
+public import FormalConjecturesUtil
 
 /-!
 # Open Quantum Problem 23: SIC-POVMs
@@ -104,6 +105,8 @@ placeholder proofs `by sorry`; they are intended to be proved in the next PR.
   *Quantum Designs: Foundations of a Noncommutative Design Theory*,
   PhD thesis, University of Vienna (1999).
 -/
+
+@[expose] public section
 noncomputable section
 namespace OpenQuantumProblem23
 
@@ -183,7 +186,7 @@ lemma isSICFamily_one_of_normalized {ψ : StateVector 1} (hψ : IsNormalized ψ)
 @[category test, AMS 15 47 81]
 theorem hasSICPOVM_one : HasSICPOVM 1 := by
   refine ⟨fun _ => EuclideanSpace.single 0 1, isSICFamily_one_of_normalized ?_⟩
-  simp [IsNormalized, EuclideanSpace.norm_single]
+  simp [IsNormalized]
 
 /- ## Explicit low-dimensional witnesses -/
 
@@ -242,10 +245,29 @@ lemma sicOverlapSq_two : sicOverlapSq 2 = (1 / 3 : ℝ) := by
 lemma sicOverlapSq_three : sicOverlapSq 3 = (1 / 4 : ℝ) := by
   simp [sicOverlapSq]; norm_num
 
+/-- The unit complex number `ω` (primitive cube root) has norm `1`. -/
+@[category API, AMS 15 47 81]
+private lemma omega_norm : ‖ω‖ = 1 := by
+  rw [Complex.norm_def, ω]
+  simp [Complex.normSq_apply]
+  have : Real.sqrt 3 * Real.sqrt 3 = 3 := Real.mul_self_sqrt (by norm_num)
+  rw [show (-1 / 2 : ℝ) * (-1 / 2) + Real.sqrt 3 / 2 * (Real.sqrt 3 / 2) = 1
+    from by nlinarith]
+
 /-- Every vector in the tetrahedral qubit SIC family is normalized. -/
 @[category test, AMS 15 47 81]
 lemma qubitSICFamily_normalized (i : Fin 4) :
-    IsNormalized (qubitSICFamily i) := by sorry
+    IsNormalized (qubitSICFamily i) := by
+  have h2 : Real.sqrt 2 ^ 2 = 2 := Real.sq_sqrt (by norm_num)
+  have h3 : Real.sqrt 3 ^ 2 = 3 := Real.sq_sqrt (by norm_num)
+  have sqrt2_pos : (0:ℝ) < Real.sqrt 2 := Real.sqrt_pos.mpr (by norm_num)
+  have sqrt3_pos : (0:ℝ) < Real.sqrt 3 := Real.sqrt_pos.mpr (by norm_num)
+  have omega2_norm : ‖ω ^ 2‖ = 1 := by rw [norm_pow, omega_norm]; ring
+  fin_cases i <;>
+    simp [IsNormalized, qubitSICFamily, vec2, mkStateVector,
+      EuclideanSpace.norm_eq, Fin.sum_univ_two, tetraA, tetraB,
+      omega_norm, omega2_norm, abs_of_pos sqrt2_pos, abs_of_pos sqrt3_pos]
+  all_goals (try (field_simp; linarith [h2, h3]))
 
 /-- The tetrahedral qubit SIC family has the correct constant pairwise overlap. -/
 @[category test, AMS 15 47 81]
@@ -259,7 +281,15 @@ theorem hasSICPOVM_two : HasSICPOVM 2 := by sorry
 /-- Every vector in the Hesse qutrit SIC family is normalized. -/
 @[category test, AMS 15 47 81]
 lemma hesseFamily_normalized (i : Fin 9) :
-    IsNormalized (hesseFamily i) := by sorry
+    IsNormalized (hesseFamily i) := by
+  have h2 : Real.sqrt 2 ^ 2 = 2 := Real.sq_sqrt (by norm_num)
+  have sqrt2_pos : (0:ℝ) < Real.sqrt 2 := Real.sqrt_pos.mpr (by norm_num)
+  have omega2_norm : ‖ω ^ 2‖ = 1 := by rw [norm_pow, omega_norm]; ring
+  fin_cases i <;>
+    simp [IsNormalized, hesseFamily, vec3, mkStateVector,
+      EuclideanSpace.norm_eq, Fin.sum_univ_three, hesseS,
+      omega_norm, omega2_norm, abs_of_pos sqrt2_pos]
+  all_goals (try (field_simp; linarith [h2]))
 
 /-- The Hesse qutrit SIC family has the correct constant pairwise overlap. -/
 @[category test, AMS 15 47 81]
@@ -273,73 +303,68 @@ theorem hasSICPOVM_three : HasSICPOVM 3 := by sorry
 /-- Every vector in the BB84 family is normalized. -/
 @[category test, AMS 15 47 81]
 lemma bb84Family_normalized (i : Fin 4) :
-    IsNormalized (bb84Family i) := by sorry
+    IsNormalized (bb84Family i) := by
+  fin_cases i <;> simp [IsNormalized, bb84Family, vec2, EuclideanSpace.norm_eq, hesseS] <;> grind
 
 /-- The BB84 family has the right cardinality for a qubit SIC but fails the constant-overlap condition. -/
 @[category test, AMS 15 47 81]
 theorem bb84Family_not_isSICFamily : ¬ IsSICFamily 2 bb84Family := by
   intro h
-  have h_const := h.2
-  unfold HasConstantOverlapSq at h_const
-  change ∀ i j, i ≠ j → overlapSq (bb84Family i) (bb84Family j) = sicOverlapSq 2 at h_const
-  have h_overlap := h_const (0 : Fin 4) (1 : Fin 4) (by decide)
-  rw [sicOverlapSq_two] at h_overlap
-  unfold overlapSq at h_overlap
-  rw [Fin.sum_univ_two] at h_overlap
-  simp [bb84Family, vec2] at h_overlap
+  have h_overlap := h.2 (show 0 ≠ 1 by decide)
+  simp [Fin.sum_univ_two, bb84Family, vec2, overlapSq, sicOverlapSq_two] at h_overlap
 
 /- ## Smallest open special cases (all d<=75) -/
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $56$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_56 : answer(sorry) ↔ HasSICPOVM 56 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_56 : HasSICPOVM 56 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $58$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_58 : answer(sorry) ↔ HasSICPOVM 58 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_58 : HasSICPOVM 58 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $59$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_59 : answer(sorry) ↔ HasSICPOVM 59 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_59 : HasSICPOVM 59 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $60$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_60 : answer(sorry) ↔ HasSICPOVM 60 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_60 : HasSICPOVM 60 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $64$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_64 : answer(sorry) ↔ HasSICPOVM 64 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_64 : HasSICPOVM 64 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $68$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_68 : answer(sorry) ↔ HasSICPOVM 68 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_68 : HasSICPOVM 68 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $69$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_69 : answer(sorry) ↔ HasSICPOVM 69 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_69 : HasSICPOVM 69 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $70$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_70 : answer(sorry) ↔ HasSICPOVM 70 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_70 : HasSICPOVM 70 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $71$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_71 : answer(sorry) ↔ HasSICPOVM 71 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_71 : HasSICPOVM 71 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $72$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_72 : answer(sorry) ↔ HasSICPOVM 72 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_72 : HasSICPOVM 72 := by sorry
 
 /-- Benchmark open subproblem: existence of a SIC-POVM in dimension $75$. -/
-@[category research open, AMS 15 47 81]
-theorem hasSICPOVM_75 : answer(sorry) ↔ HasSICPOVM 75 := by sorry
+@[category research open, question, AMS 15 47 81]
+theorem hasSICPOVM_75 : HasSICPOVM 75 := by sorry
 
 /- ## Full conjecture -/
 
 /-- Do SIC-POVMs exist in every finite dimension? -/
-@[category research open, AMS 15 47 81]
+@[category research open, question, AMS 15 47 81]
 theorem sicPOVMs :
-    answer(sorry) ↔ ∀ d : ℕ, 1 ≤ d → HasSICPOVM d := by
+    ∀ d : ℕ, 1 ≤ d → HasSICPOVM d := by
   sorry
 
 end OpenQuantumProblem23
